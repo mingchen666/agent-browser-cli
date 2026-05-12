@@ -28,3 +28,5 @@ build/
 dist/
 target/
 *.egg-info/
+# Generated npm platform packages
+npm/platform/

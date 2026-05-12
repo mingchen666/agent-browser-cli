@@ -19,6 +19,9 @@ use uuid::Uuid;
 const HOST: &str = "127.0.0.1";
 const WS_PORT: u16 = 18765;
 const API_PORT: u16 = 18767;
+// daemon 在无 CLI/API 业务请求后自动退出，避免浏览器扩展长期保持“已连接”浮层。
+const IDLE_SHUTDOWN_TTL: Duration = Duration::from_secs(300);
+const IDLE_SHUTDOWN_CHECK_INTERVAL: Duration = Duration::from_secs(5);
 
 #[derive(Clone)]
 pub struct AppState {
@@ -89,6 +92,11 @@ pub async fn run_daemon() -> Result<()> {
         }
     });
 
+    let idle_state = state.clone();
+    tokio::spawn(async move {
+        monitor_idle_shutdown(idle_state).await;
+    });
+
     let app = Router::new()
         .route("/", get(root))
         .route("/health", get(health))
@@ -122,6 +130,21 @@ async fn run_ws_server(state: AppState) -> Result<()> {
 
 async fn ws_handler(ws: WebSocketUpgrade, State(state): State<AppState>) -> impl IntoResponse {
     ws.on_upgrade(move |socket| handle_socket(socket, state))
+}
+
+async fn monitor_idle_shutdown(state: AppState) {
+    loop {
+        tokio::time::sleep(IDLE_SHUTDOWN_CHECK_INTERVAL).await;
+        let idle_for = state.last_activity.lock().await.elapsed();
+        if idle_for >= IDLE_SHUTDOWN_TTL {
+            eprintln!(
+                "agent-browser-cli daemon idle for {}s, shutting down",
+                idle_for.as_secs()
+            );
+            let _ = state.shutdown.send(());
+            break;
+        }
+    }
 }
 
 async fn handle_socket(mut socket: WebSocket, state: AppState) {
@@ -239,14 +262,23 @@ async fn root() -> &'static str {
 }
 
 async fn health(State(state): State<AppState>) -> Json<Value> {
-    touch(&state).await;
     let ready = !active_tabs(&state, false).await.is_empty();
     let uptime = state
         .started_at
         .elapsed()
         .map(|d| d.as_secs_f64())
         .unwrap_or_default();
-    Json(json!({ "ok": ready, "running": true, "ready": ready, "uptime": uptime, "ttl": 300 }))
+    let idle_for = state.last_activity.lock().await.elapsed().as_secs_f64();
+    let ttl = IDLE_SHUTDOWN_TTL.as_secs_f64();
+    Json(json!({
+        "ok": ready,
+        "running": true,
+        "ready": ready,
+        "uptime": uptime,
+        "idle_for": idle_for,
+        "ttl": ttl,
+        "ttl_remaining": (ttl - idle_for).max(0.0)
+    }))
 }
 
 async fn tabs(State(state): State<AppState>) -> Json<Value> {
