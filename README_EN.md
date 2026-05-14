@@ -28,7 +28,7 @@ This project is not Selenium or Playwright. It is better suited for helping agen
 
 - Current version: `0.2.5`
 - Supported platforms: Windows (including WSL) / Mac / Linux
-- Browser: Chrome / Chromium, with `assets/tmwd_cdp_bridge` loaded
+- Browser: Chrome, with the `assets/tmwd_cdp_bridge` extension loaded
 - Linux prerequisite: the local Chrome / Chromium build must support loading extensions
 - WSL prerequisite: use `WSL 2.0.0+`, and preferably enable `networkingMode=mirrored` on Windows `11 22H2+` so WSL can reach the host Chrome bridge service on `localhost`
 
@@ -119,6 +119,8 @@ assets/tmwd_cdp_bridge
 ```
 
 Chrome needs at least one normal web page tab open. Do not leave it only on `about:blank` or `chrome://` pages.
+
+After the extension is connected, a Chrome extension tip badge appears on the right side of the page. The badge position is draggable and expands on hover. It auto-hides after 10 seconds without commands, and you can also click `Hide for this session` to hide it manually. Manual hiding lasts for the current service connection cycle and resets after the service disconnects after about 300 seconds and reconnects.
 
 ## Quick Check
 

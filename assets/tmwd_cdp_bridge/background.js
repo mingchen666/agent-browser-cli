@@ -15,8 +15,11 @@ chrome.runtime.onInstalled.addListener(() => {
   });
 });
 
+let lastCommandAt = 0;
+
 async function handleExtMessage(msg, sender) {
   if (msg.cmd === 'status') return handleStatus();
+  lastCommandAt = Date.now();
   if (msg.cmd === 'cookies') return await handleCookies(msg, sender);
   if (msg.cmd === 'cdp') return await handleCDP(msg, sender);
   if (msg.cmd === 'batch') return await handleBatch(msg, sender);
@@ -75,7 +78,8 @@ function handleStatus() {
     ok: true,
     data: {
       wsConnected: !!ws && ws.readyState === WebSocket.OPEN,
-      wsUrl: WS_URL
+      wsUrl: WS_URL,
+      lastCommandAt
     }
   };
 }
@@ -172,6 +176,20 @@ async function handleCDP(msg, sender) {
 }
 // Filter out chrome:// and other internal tabs that can't be scripted
 const isScriptable = url => url && /^https?:/.test(url);
+
+async function injectContentScriptsIntoExistingTabs() {
+  const tabs = (await chrome.tabs.query({})).filter(t => isScriptable(t.url));
+  for (const tab of tabs) {
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId: tab.id, allFrames: true },
+        files: ['config.js', 'content.js']
+      });
+    } catch (e) {
+      console.log('[TMWD-WS] Inject content script failed:', tab.id, e.message);
+    }
+  }
+}
 
 // --- Shared page/CDP script builder core ---
 function buildExecScript(code, errorHandler) {
@@ -380,6 +398,7 @@ function connectWS() {
     try {
       const data = JSON.parse(event.data);
       if (data.id && data.code) {
+        lastCommandAt = Date.now();
         let code = data.code;
         // If code is a JSON string representing an object, parse it
         if (typeof code === 'string') {
@@ -417,8 +436,15 @@ function connectWS() {
 
 // Initial connect + wake-up hooks
 connectWS();
-chrome.runtime.onStartup.addListener(() => connectWS());
-chrome.runtime.onInstalled.addListener(() => connectWS());
+injectContentScriptsIntoExistingTabs();
+chrome.runtime.onStartup.addListener(() => {
+  connectWS();
+  injectContentScriptsIntoExistingTabs();
+});
+chrome.runtime.onInstalled.addListener(() => {
+  connectWS();
+  injectContentScriptsIntoExistingTabs();
+});
 
 // Sync tab list on changes
 async function sendTabsUpdate() {
