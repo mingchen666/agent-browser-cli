@@ -12,7 +12,6 @@ Browser perception · Page control · Chrome session reuse · CDP · Conditional
   <a href="https://github.com/sleepinginsummer/agent-browser-cli"><img src="https://img.shields.io/badge/sys-win%2Fmac%2Flinux-0078D6?labelColor=0078D6&color=C0C0C0" alt="sys win/mac/linux"></a>
   <a href="https://github.com/sleepinginsummer/agent-browser-cli/releases"><img src="https://img.shields.io/badge/release-v0.2.9-blue" alt="release v0.2.9"></a>
   <a href="https://github.com/sleepinginsummer/agent-browser-cli/pulls"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen" alt="PRs welcome"></a>
-  <a href="https://github.com/sleepinginsummer/agent-browser-cli/stargazers"><img src="https://img.shields.io/github/stars/sleepinginsummer/agent-browser-cli?label=stars&color=yellow" alt="GitHub stars"></a>
 </p>
 
 [AI One-Line Install](#ai-one-line-install) · [Manual Installation](#manual-installation) · [Chrome Extension](#chrome-extension) · [Update](#update) · [Uninstall](#uninstall) · [Friendly Links](#friendly-links)
