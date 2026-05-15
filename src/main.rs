@@ -1,4 +1,5 @@
 mod cli;
+mod config;
 mod html;
 mod protocol;
 mod server;

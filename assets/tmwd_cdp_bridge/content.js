@@ -1,4 +1,5 @@
 ;(function(){ if (/streamlit/i.test(document.title)) return;
+const TID = globalThis.__agent_browser_cli_TID || '__agent_browser_cli_bridge_26c9f1';
 if (window.__agentBrowserCliCleanup) window.__agentBrowserCliCleanup();
 if (window.__agentBrowserCliObserverCleanup) window.__agentBrowserCliObserverCleanup();
 document.querySelectorAll('#agent-browser-cli-ind,#agent-browser-cli-style').forEach(e => e.remove());

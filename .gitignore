@@ -11,6 +11,7 @@ env/
 # Runtime files
 .agent-browser-cli.log
 .agent-browser-cli.lock
+task.md
 *.log
 
 # OS / editor

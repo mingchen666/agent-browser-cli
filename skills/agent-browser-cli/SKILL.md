@@ -44,7 +44,7 @@ assets/tmwd_cdp_bridge
 扩展配置必须存在：
 
 ```js
-const TID = '__agent_browser_cli_bridge_26c9f1';
+globalThis.__agent_browser_cli_TID = '__agent_browser_cli_bridge_26c9f1';
 ```
 
 对应文件：
@@ -72,13 +72,36 @@ agent-browser-cli restart
 ```
 
 常驻服务端口：
-- `18765`：底层 `TMWebDriver` WebSocket，Chrome 扩展连接使用。
-- `18767`：外层 `agent-browser-cli` HTTP 服务，供 CLI 复用会话。
+- `18765`：默认插件 WebSocket 端口，Chrome 扩展连接使用，可通过插件 popup 或 `agent-browser-cli set-extension-port <port>` 修改。
+- `18767`：外层 `agent-browser-cli` HTTP API 端口，供 CLI 复用会话，不能作为插件端口使用。
+
+插件端口配置文件：
+
+```text
+~/.agent-browser-cli/config.json
+```
+
+最小配置：
+
+```json
+{
+  "extension_port": 18765
+}
+```
+
+CLI 修改插件端口：
+
+```bash
+agent-browser-cli set-extension-port 18766
+```
+
+Chrome 插件 popup 也可以修改插件端口并立即重连。插件端口必须和 CLI 配置中的 `extension_port` 一致。
 
 成功标志：
 - 返回 `status=success`
 - 能看到 `tabs_count`
-- 首次运行会拉起本地 WS 服务 `ws://127.0.0.1:18765`
+- `agent-browser-cli status` 中 `ports.extension.matched=true`
+- `agent-browser-cli status` 中 `connection.extension_connected=true`
 
 ## 推荐 CLI 调用
 

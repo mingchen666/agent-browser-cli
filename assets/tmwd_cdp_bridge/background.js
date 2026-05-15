@@ -16,9 +16,13 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 
 let lastCommandAt = 0;
+const DEFAULT_WS_PORT = 18765;
+const CLI_API_PORT = 18767;
+let wsPort = DEFAULT_WS_PORT;
 
 async function handleExtMessage(msg, sender) {
   if (msg.cmd === 'status') return handleStatus();
+  if (msg.cmd === 'setPort') return await handleSetPort(msg);
   lastCommandAt = Date.now();
   if (msg.cmd === 'cookies') return await handleCookies(msg, sender);
   if (msg.cmd === 'cdp') return await handleCDP(msg, sender);
@@ -78,8 +82,23 @@ function handleStatus() {
     ok: true,
     data: {
       wsConnected: !!ws && ws.readyState === WebSocket.OPEN,
-      wsUrl: WS_URL,
+      wsUrl: getWsUrl(),
+      wsPort,
       lastCommandAt
+    }
+  };
+}
+
+async function handleSetPort(msg) {
+  const port = normalizePort(msg.port);
+  await saveWsPort(port);
+  reconnectWS();
+  return {
+    ok: true,
+    data: {
+      wsPort,
+      wsUrl: getWsUrl(),
+      wsConnected: !!ws && ws.readyState === WebSocket.OPEN
     }
   };
 }
@@ -250,11 +269,36 @@ function buildCdpScript(code) {
 
 // --- WebSocket Client for TMWebDriver ---
 let ws = null;
-const WS_URL = 'ws://127.0.0.1:18765';
+
+function normalizePort(port) {
+  const value = Number(port);
+  if (!Number.isInteger(value) || value < 1 || value > 65535) {
+    throw new Error('端口必须是 1-65535');
+  }
+  if (value === CLI_API_PORT) {
+    throw new Error('18767 是 agent-browser-cli API 端口，请换一个插件端口');
+  }
+  return value;
+}
+
+async function loadWsPort() {
+  const data = await chrome.storage.local.get({ wsPort: DEFAULT_WS_PORT });
+  wsPort = normalizePort(data.wsPort);
+  return wsPort;
+}
+
+async function saveWsPort(port) {
+  wsPort = normalizePort(port);
+  await chrome.storage.local.set({ wsPort });
+}
+
+function getWsUrl() {
+  return `ws://127.0.0.1:${wsPort}`;
+}
 
 function scheduleProbe() {
   // Use chrome.alarms to survive MV3 service worker suspension
-  chrome.alarms.create('tmwd-ws-probe', { delayInMinutes: 0.083 }); // ~5s
+  chrome.alarms.create('tmwd-ws-probe', { delayInMinutes: 0.017 }); // ~1s
 }
 
 function scheduleKeepalive() {
@@ -266,7 +310,7 @@ async function isServerAlive() {
   try {
     const ctrl = new AbortController();
     setTimeout(() => ctrl.abort(), 2000);
-    await fetch('http://127.0.0.1:18765', { signal: ctrl.signal });
+    await fetch(`http://127.0.0.1:${wsPort}`, { signal: ctrl.signal });
     return true; // Got HTTP response → port is listening
   } catch (e) {
     return false; // Network error (connection refused) or timeout → server not alive
@@ -372,12 +416,20 @@ async function handleWsExec(data) {
   }
 }
 
-function connectWS() {
+async function connectWS() {
+  await loadWsPort();
   if (ws && ws.readyState <= 1) return; // CONNECTING or OPEN
+  if (!(await isServerAlive())) {
+    console.warn('[TMWD-WS] Server not ready, retrying later:', getWsUrl());
+    ws = null;
+    scheduleProbe();
+    return;
+  }
   ws = null;
-  console.log('[TMWD-WS] Connecting to', WS_URL);
+  const wsUrl = getWsUrl();
+  console.log('[TMWD-WS] Connecting to', wsUrl);
   try {
-    ws = new WebSocket(WS_URL);
+    ws = new WebSocket(wsUrl);
   } catch (e) {
     console.error('[TMWD-WS] Constructor error:', e);
     ws = null;
@@ -429,9 +481,19 @@ function connectWS() {
     scheduleProbe();
   };
   ws.onerror = (e) => {
-    console.error('[TMWD-WS] Error:', e);
+    console.warn('[TMWD-WS] Connection warning:', e);
     // onclose will fire after this, which triggers reconnect
   };
+}
+
+function reconnectWS() {
+  if (ws) {
+    try { ws.onclose = null; ws.close(); } catch (_) {}
+  }
+  ws = null;
+  chrome.alarms.clear('tmwd-ws-probe');
+  chrome.alarms.clear('tmwd-ws-keepalive');
+  connectWS();
 }
 
 // Initial connect + wake-up hooks

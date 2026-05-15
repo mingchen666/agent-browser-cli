@@ -1,4 +1,4 @@
-use crate::server;
+use crate::{config, server};
 use anyhow::{anyhow, Result};
 use clap::{Args, Parser, Subcommand};
 use fs2::FileExt;
@@ -30,6 +30,8 @@ enum CommandKind {
     #[command(name = "new-tab")]
     NewTab(OpenArgs),
     Status,
+    #[command(name = "set-extension-port")]
+    SetExtensionPort(SetExtensionPortArgs),
     Stop,
     Restart,
     Daemon,
@@ -76,6 +78,11 @@ struct OpenArgs {
     tab: Option<String>,
     #[arg(long, default_value_t = 30.0)]
     timeout: f64,
+}
+
+#[derive(Debug, Args)]
+struct SetExtensionPortArgs {
+    port: u16,
 }
 
 pub fn run() -> Result<()> {
@@ -143,8 +150,44 @@ pub fn run() -> Result<()> {
         CommandKind::Status => {
             match request("GET", "/health", None, 1.0) {
                 Ok(value) => print_json(value),
-                Err(_) => print_json(json!({ "ok": true, "running": false })),
+                Err(_) => {
+                    let configured = config::load_or_create()?.extension_port;
+                    print_json(json!({
+                        "ok": true,
+                        "running": false,
+                        "ready": false,
+                        "ports": {
+                            "api": PORT,
+                            "extension": {
+                                "configured": configured,
+                                "listening": null,
+                                "matched": false
+                            }
+                        },
+                        "connection": {
+                            "extension_connected": false,
+                            "active_tabs": 0
+                        }
+                    }))
+                }
             }
+            Ok(())
+        }
+        CommandKind::SetExtensionPort(args) => {
+            let was_running = is_server_alive();
+            let config = config::set_extension_port(args.port)?;
+            let mut restarted = false;
+            if was_running {
+                let _ = request("POST", "/shutdown", Some(json!({})), 3.0);
+                wait_server_stopped(Duration::from_secs(5));
+                ensure_server()?;
+                restarted = true;
+            }
+            print_json(json!({
+                "ok": true,
+                "extension_port": config.extension_port,
+                "restarted": restarted
+            }));
             Ok(())
         }
         CommandKind::Stop => {

@@ -10,7 +10,7 @@
   <a href="https://github.com/sleepinginsummer/agent-browser-cli"><img src="https://img.shields.io/badge/CLI-agentbrowsercli-2ea44f" alt="CLI agentbrowsercli"></a>
   <a href="https://github.com/sleepinginsummer/agent-browser-cli/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-green" alt="License MIT"></a>
   <a href="https://github.com/sleepinginsummer/agent-browser-cli"><img src="https://img.shields.io/badge/sys-win%2Fmac%2Flinux-0078D6?labelColor=0078D6&color=C0C0C0" alt="sys win/mac/linux"></a>
-  <a href="https://github.com/sleepinginsummer/agent-browser-cli/releases"><img src="https://img.shields.io/badge/release-v0.2.7-blue" alt="release v0.2.7"></a>
+  <a href="https://github.com/sleepinginsummer/agent-browser-cli/releases"><img src="https://img.shields.io/badge/release-v0.2.8-blue" alt="release v0.2.8"></a>
   <a href="https://github.com/sleepinginsummer/agent-browser-cli/pulls"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen" alt="PRs welcome"></a>
 </p>
 
@@ -26,7 +26,7 @@
 
 ## 项目信息
 
-- 当前版本：`0.2.7`
+- 当前版本：`0.2.8`
 - 支持平台：Windows（包括 WSL）/ Mac / Linux
 - 浏览器：Chrome，需加载拓展 `assets/tmwd_cdp_bridge`
 - Linux 支持前提：本机 Chrome / Chromium 需要支持安装扩展
@@ -112,17 +112,51 @@ cargo build --release
 
 ## Chrome 扩展
 
-推荐从 [最新 Release](https://github.com/sleepinginsummer/agent-browser-cli/releases/latest) 下载 `chrome-extensions.zip`，下载后解压，Chrome 打开 `chrome://extensions`，开启“开发者模式”，点击“加载已解压的扩展程序”，选择解压后的 `tmwd_cdp_bridge` 目录。
+1. 推荐从 [最新 Release](https://github.com/sleepinginsummer/agent-browser-cli/releases/latest) 下载 `chrome-extensions.zip`，下载后解压，Chrome 打开 `chrome://extensions`，开启“开发者模式”，点击“加载已解压的扩展程序”，选择解压后的 `tmwd_cdp_bridge` 目录。
 
-本地源码构建时，也可以直接加载扩展目录：
+2. 本地源码构建时，也可以直接加载扩展目录：
 
 ```text
 assets/tmwd_cdp_bridge
 ```
 
-Chrome 需要至少打开一个正常网页标签页，不要只停留在 `about:blank` 或 `chrome://` 页面。
+3. Chrome 需要至少打开一个正常网页标签页，不要只停留在 `about:blank` 或 `chrome://` 页面。
+4. 扩展连接后会在页面右侧显示 Chrome 插件提示角标。角标支持拖动位置，鼠标悬浮时展开；10 秒无命令后自动隐藏，也可以点击 `本次隐藏` 手动隐藏，本次服务连接周期内不再显示，约 300 秒服务断开并下次重连后恢复。
 
-扩展连接后会在页面右侧显示 Chrome 插件提示角标。角标支持拖动位置，鼠标悬浮时展开；10 秒无命令后自动隐藏，也可以点击 `本次隐藏` 手动隐藏，本次服务连接周期内不再显示，约 300 秒服务断开并下次重连后恢复。
+###  自定义Chrome插件的ws监听端口
+
+- `18765`：默认插件 WebSocket 端口，Chrome 扩展连接使用，可通过 `agent-browser-cli set-extension-port <port>` 修改。
+- `18767`：CLI HTTP API 端口，供 CLI 复用会话，不能作为插件端口使用。
+
+CLI 修改插件端口：
+
+```bash
+agent-browser-cli set-extension-port 18766
+```
+
+该命令会写入配置文件；如果 daemon 正在运行，会自动重启 daemon，让新端口立即生效。
+
+也可以手动修改配置文件。配置文件位于 `~/.agent-browser-cli/config.json`，不存在时会自动生成：
+
+```json
+{
+  "extension_port": 18765
+}
+```
+
+手动修改示例：
+
+```json
+{
+  "extension_port": 18766
+}
+```
+
+手动改配置后需要执行 `agent-browser-cli restart`，daemon 才会按新端口重新监听。
+
+Chrome 插件 popup 中也可以修改插件端口并立即重连。插件端口必须和 CLI 配置中的 `extension_port` 一致。
+
+
 
 ## 快速自检
 
@@ -155,26 +189,13 @@ agent-browser-cli tabs
 
 ## 更新
 
-```bash
-git pull
-cargo build --release
-./target/release/agent-browser-cli restart
+ai一句话更新
+```text
+请阅读 https://github.com/sleepinginsummer/agent-browser-cli/blob/main/AI_INSTALL.md，按说明更新 CLI、重新下载插件zip让用户指定位置，用户手动加载 Chrome 扩展，并更新相关 SKILL.md`。
 ```
 
-如果 Chrome 扩展有更新，在 `chrome://extensions` 中重新加载 `assets/tmwd_cdp_bridge` 扩展。
+如果 Chrome 扩展有更新，在 `chrome://extensions` 中重新下载zpi覆盖，然后重新加载 `assets/tmwd_cdp_bridge` 扩展。
 
-当前扩展配置标识为：
-
-```js
-const TID = '__agent_browser_cli_bridge_26c9f1';
-```
-
-如果你把 skill 安装到了 Codex/Agent 的全局目录，更新后同步复制：
-
-```bash
-mkdir -p ~/.agents/skills/agent-browser-cli
-cp skills/agent-browser-cli/SKILL.md ~/.agents/skills/agent-browser-cli/SKILL.md
-```
 
 ## 卸载
 
@@ -193,10 +214,7 @@ rm -rf ~/.agents/skills/agent-browser-cli
 
 最后在 Chrome 扩展管理页中移除 `TMWD CDP Bridge` 扩展，或删除已加载的 `assets/tmwd_cdp_bridge` 扩展配置。
 
-## 端口
 
-- `18765`：底层 `TMWebDriver` WebSocket，Chrome 扩展连接使用。
-- `18767`：外层 `agent-browser-cli` HTTP 服务，供 CLI 复用会话。
 
 ## 友情链接
 

@@ -10,7 +10,7 @@ Browser perception · Page control · Chrome session reuse · CDP · Conditional
   <a href="https://github.com/sleepinginsummer/agent-browser-cli"><img src="https://img.shields.io/badge/CLI-agentbrowsercli-2ea44f" alt="CLI agentbrowsercli"></a>
   <a href="https://github.com/sleepinginsummer/agent-browser-cli/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-green" alt="License MIT"></a>
   <a href="https://github.com/sleepinginsummer/agent-browser-cli"><img src="https://img.shields.io/badge/sys-win%2Fmac%2Flinux-0078D6?labelColor=0078D6&color=C0C0C0" alt="sys win/mac/linux"></a>
-  <a href="https://github.com/sleepinginsummer/agent-browser-cli/releases"><img src="https://img.shields.io/badge/release-v0.2.7-blue" alt="release v0.2.7"></a>
+  <a href="https://github.com/sleepinginsummer/agent-browser-cli/releases"><img src="https://img.shields.io/badge/release-v0.2.8-blue" alt="release v0.2.8"></a>
   <a href="https://github.com/sleepinginsummer/agent-browser-cli/pulls"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen" alt="PRs welcome"></a>
 </p>
 
@@ -26,7 +26,7 @@ This project is not Selenium or Playwright. It is better suited for helping agen
 
 ## Project Info
 
-- Current version: `0.2.7`
+- Current version: `0.2.8`
 - Supported platforms: Windows (including WSL) / Mac / Linux
 - Browser: Chrome, with the `assets/tmwd_cdp_bridge` extension loaded
 - Linux prerequisite: the local Chrome / Chromium build must support loading extensions
@@ -112,17 +112,49 @@ cargo build --release
 
 ## Chrome Extension
 
-Recommended: download `chrome-extensions.zip` from the [latest Release](https://github.com/sleepinginsummer/agent-browser-cli/releases/latest), extract it, open `chrome://extensions` in Chrome, enable `Developer mode`, click `Load unpacked`, and select the extracted `tmwd_cdp_bridge` directory.
+1. Recommended: download `chrome-extensions.zip` from the [latest Release](https://github.com/sleepinginsummer/agent-browser-cli/releases/latest), extract it, open `chrome://extensions` in Chrome, enable `Developer mode`, click `Load unpacked`, and select the extracted `tmwd_cdp_bridge` directory.
 
-When building from local source, you can also load this extension directory directly:
+2. When building from local source, you can also load this extension directory directly:
 
 ```text
 assets/tmwd_cdp_bridge
 ```
 
-Chrome needs at least one normal web page tab open. Do not leave it only on `about:blank` or `chrome://` pages.
+3. Chrome needs at least one normal web page tab open. Do not leave it only on `about:blank` or `chrome://` pages.
+4. After the extension is connected, a Chrome extension tip badge appears on the right side of the page. The badge position is draggable and expands on hover. It auto-hides after 10 seconds without commands, and you can also click `Hide for this session` to hide it manually. Manual hiding lasts for the current service connection cycle and resets after the service disconnects after about 300 seconds and reconnects.
 
-After the extension is connected, a Chrome extension tip badge appears on the right side of the page. The badge position is draggable and expands on hover. It auto-hides after 10 seconds without commands, and you can also click `Hide for this session` to hide it manually. Manual hiding lasts for the current service connection cycle and resets after the service disconnects after about 300 seconds and reconnects.
+### Custom Chrome Extension WebSocket Port
+
+- `18765`: default extension WebSocket port, used by the Chrome extension. It can be changed with `agent-browser-cli set-extension-port <port>`.
+- `18767`: CLI HTTP API port, used by the CLI to reuse the session. It cannot be used as the extension port.
+
+Change the extension port from CLI:
+
+```bash
+agent-browser-cli set-extension-port 18766
+```
+
+This command writes the config file. If the daemon is running, it restarts the daemon so the new port takes effect immediately.
+
+You can also edit the config file manually. The config file is `~/.agent-browser-cli/config.json`. It is created automatically when missing:
+
+```json
+{
+  "extension_port": 18765
+}
+```
+
+Manual edit example:
+
+```json
+{
+  "extension_port": 18766
+}
+```
+
+After manually editing the config file, run `agent-browser-cli restart` so the daemon listens on the new port.
+
+The Chrome extension popup can also update the extension port and reconnect immediately. The popup port must match the CLI `extension_port` config.
 
 ## Quick Check
 
@@ -155,26 +187,13 @@ agent-browser-cli tabs
 
 ## Update
 
-```bash
-git pull
-cargo build --release
-./target/release/agent-browser-cli restart
+AI one-line update:
+
+```text
+Please read https://github.com/sleepinginsummer/agent-browser-cli/blob/main/AI_INSTALL.md, follow the instructions to update the CLI, download the extension zip again to the user-specified location, ask the user to manually load the Chrome extension, and update the related SKILL.md.
 ```
 
-If the Chrome extension has updates, reload the `assets/tmwd_cdp_bridge` extension in `chrome://extensions`.
-
-Current extension bridge identifier:
-
-```js
-const TID = '__agent_browser_cli_bridge_26c9f1';
-```
-
-If you installed the skill into a global Codex/Agent directory, copy it again after updating:
-
-```bash
-mkdir -p ~/.agents/skills/agent-browser-cli
-cp skills/agent-browser-cli/SKILL.md ~/.agents/skills/agent-browser-cli/SKILL.md
-```
+If the Chrome extension has updates, download the zip again, overwrite the existing files, and reload the `assets/tmwd_cdp_bridge` extension in `chrome://extensions`.
 
 ## Uninstall
 
@@ -192,11 +211,6 @@ rm -rf ~/.agents/skills/agent-browser-cli
 ```
 
 Finally, remove the `TMWD CDP Bridge` extension from Chrome's extension management page, or remove the loaded `assets/tmwd_cdp_bridge` extension configuration.
-
-## Ports
-
-- `18765`: underlying `TMWebDriver` WebSocket, used by the Chrome extension.
-- `18767`: outer `agent-browser-cli` HTTP service, used by the CLI to reuse the session.
 
 ## Friendly Links
 

@@ -1,5 +1,5 @@
-use crate::html;
 use crate::protocol::{DriverState, ExecResult, Session, TabInfo, WsIncoming};
+use crate::{config, html};
 use anyhow::{anyhow, Result};
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::State;
@@ -17,7 +17,6 @@ use tower_http::cors::CorsLayer;
 use uuid::Uuid;
 
 const HOST: &str = "127.0.0.1";
-const WS_PORT: u16 = 18765;
 const API_PORT: u16 = 18767;
 // daemon 在无 CLI/API 业务请求后自动退出，避免浏览器扩展长期保持“已连接”浮层。
 const IDLE_SHUTDOWN_TTL: Duration = Duration::from_secs(300);
@@ -30,6 +29,7 @@ pub struct AppState {
     last_activity: Arc<Mutex<Instant>>,
     shutdown: mpsc::UnboundedSender<()>,
     sessions_ready: Arc<Notify>,
+    extension_port: u16,
 }
 
 #[derive(Debug, Deserialize)]
@@ -76,6 +76,7 @@ fn default_wait_interval() -> f64 {
 }
 
 pub async fn run_daemon() -> Result<()> {
+    let extension_port = config::load_or_create()?.extension_port;
     let (shutdown_tx, mut shutdown_rx) = mpsc::unbounded_channel::<()>();
     let state = AppState {
         driver: Arc::new(Mutex::new(DriverState::default())),
@@ -83,6 +84,7 @@ pub async fn run_daemon() -> Result<()> {
         last_activity: Arc::new(Mutex::new(Instant::now())),
         shutdown: shutdown_tx,
         sessions_ready: Arc::new(Notify::new()),
+        extension_port,
     };
 
     let ws_state = state.clone();
@@ -120,8 +122,9 @@ pub async fn run_daemon() -> Result<()> {
 }
 
 async fn run_ws_server(state: AppState) -> Result<()> {
+    let extension_port = state.extension_port;
     let app = Router::new().route("/", get(ws_handler)).with_state(state);
-    let addr: SocketAddr = format!("{HOST}:{WS_PORT}").parse()?;
+    let addr: SocketAddr = format!("{HOST}:{extension_port}").parse()?;
     let listener = tokio::net::TcpListener::bind(addr).await?;
     println!("WebSocket server running on ws://{addr}");
     axum::serve(listener, app).await?;
@@ -262,7 +265,9 @@ async fn root() -> &'static str {
 }
 
 async fn health(State(state): State<AppState>) -> Json<Value> {
-    let ready = !active_tabs(&state, false).await.is_empty();
+    let active_tabs_count = active_tabs(&state, false).await.len();
+    let extension_connected = has_extension_connection(&state).await;
+    let ready = active_tabs_count > 0;
     let uptime = state
         .started_at
         .elapsed()
@@ -270,10 +275,25 @@ async fn health(State(state): State<AppState>) -> Json<Value> {
         .unwrap_or_default();
     let idle_for = state.last_activity.lock().await.elapsed().as_secs_f64();
     let ttl = IDLE_SHUTDOWN_TTL.as_secs_f64();
+    let configured_extension_port = config::load_or_create()
+        .map(|config| config.extension_port)
+        .unwrap_or(state.extension_port);
     Json(json!({
         "ok": ready,
         "running": true,
         "ready": ready,
+        "ports": {
+            "api": API_PORT,
+            "extension": {
+                "configured": configured_extension_port,
+                "listening": state.extension_port,
+                "matched": configured_extension_port == state.extension_port
+            }
+        },
+        "connection": {
+            "extension_connected": extension_connected,
+            "active_tabs": active_tabs_count
+        },
         "uptime": uptime,
         "idle_for": idle_for,
         "ttl": ttl,
@@ -353,6 +373,14 @@ async fn active_tabs(state: &AppState, wait_ready: bool) -> Vec<TabInfo> {
             info
         })
         .collect()
+}
+
+async fn has_extension_connection(state: &AppState) -> bool {
+    let driver = state.driver.lock().await;
+    driver
+        .sessions
+        .values()
+        .any(|session| session.info.tab_type == "ext_ws" && session.is_active())
 }
 
 async fn wait_for_sessions(state: &AppState, timeout: Duration) -> bool {
