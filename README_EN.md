@@ -53,32 +53,36 @@ Please read https://github.com/sleepinginsummer/agent-browser-cli/blob/main/AI_I
 - Includes several optimizations to reduce command execution time.
 - Rust implementation for the CLI side.
 
-## Performance Reference
+## What It Can Do
 
-The following numbers are measured with the long-lived service already running and the Chrome extension already connected. Actual latency depends on page complexity, network conditions, Chrome state, and response size.
+1. Automated testing
+   It can reuse a real browser environment for page-flow validation, form submission, button clicks, navigation checks, and login-state page testing.
+2. Frontend page debugging
+   It can read the DOM, execute JS, inspect page state, and capture screenshots to help locate frontend interaction, rendering, and data issues, including backend API integration problems.
+3. Page style debugging
+   It can execute JS on real pages to modify DOM / CSS and temporarily validate styles, layout, and interaction effects. It is more of a debugging assistant than a complete design tool.
+4. Web data extraction
+   It can read page content, tables, lists, cookies, and API-related state, making it suitable for extracting data from pages that require login state.
+5. Browser operation scripting
+   It can chain operations such as opening pages, switching tabs, executing JS, taking screenshots, and uploading files into scripts for repetitive web tasks.
+6. Agent-assisted web admin operation
+   It is suitable for letting AI Agents operate existing web tools such as admin consoles, configuration pages, low-code platforms, and form systems.
+7. Page structure analysis
+   It can simplify HTML and identify main content areas and list structures, helping Agents understand complex pages faster.
+8. Security research and reverse-engineering assistance
+   It can observe page behavior in a real browser session, execute debugging scripts, and read frontend state to assist analysis of frontend logic and API calls.
 
-| Operation | Reference Latency |
-| --- | --- |
-| Open a Baidu tab | About `0.10s` |
-| Inject JS to enter a keyword and submit search | About `0.27s` |
-| Open Baidu and search “小猫” end-to-end | About `0.37s` |
-| `scan --tab --text-only` to read page text | About `0.04-0.12s` |
-| `exec 'return document.title'` for simple JS | About `0.04-0.12s` |
-| `exec 'return document.body.innerText'` to read body text | Mostly `0.04-0.05s`, occasional `0.30s` |
-| Query DOM link lists | About `0.27-0.36s` |
-| `exec --monitor` page-change summary | About `0.72-0.88s` |
+## Its Capabilities
 
-Rule of thumb: normal page reads and simple JS injection are around the `50ms` level; complex DOM queries depend on page structure and returned data size, commonly around `300ms`; `--monitor` adds page-change summary work and is usually close to `0.8s`.
-
-Reference comparison with the original Python call chain:
-
-| Item | Python Version | Rust CLI Version |
-| --- | --- | --- |
-| Startup model | Each call is more likely to pay for Python process startup, module loading, and connection initialization | CLI commands reuse the long-lived service and avoid repeated browser connection initialization |
-| Simple page read / JS injection | Usually more affected by process startup and the Python call chain, so latency is less stable | Commonly `0.04-0.12s` |
-| Repeated calls | Overhead is more visible across many short commands | Better suited for high-frequency Agent calls |
-
-This comparison is intended to describe the performance trend caused by the architecture difference. Actual latency still depends on page complexity, Chrome state, and response size.
+1. Scan current Chrome tabs and get page titles, URLs, and tab IDs.
+2. Switch to a specified tab and reuse existing pages and login state.
+3. Open new tabs and directly visit target URLs.
+4. Execute JavaScript in pages and read DOM, forms, state, and page data.
+5. Read cookies from the current page for login-state related tasks.
+6. Call Chrome CDP capabilities for lower-level page control.
+7. Capture page screenshots for visual inspection and page confirmation.
+8. Upload local files to web file picker inputs.
+9. Operate common page elements such as dropdowns, buttons, and forms.
 
 ## Layout
 
