@@ -174,9 +174,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p dist/extension
-          cp -R assets/tmwd_cdp_bridge dist/extension/tmwd_cdp_bridge
-          (cd dist/extension && zip -r ../chrome-extensions.zip tmwd_cdp_bridge)
+          mkdir -p dist
+          rm -f dist/chrome-extensions.zip
+          # 压缩包根目录直接放扩展文件，拖入浏览器扩展页即可安装。
+          (cd assets/tmwd_cdp_bridge && zip -r ../../dist/chrome-extensions.zip .)
 
       - name: Create release
         shell: bash
