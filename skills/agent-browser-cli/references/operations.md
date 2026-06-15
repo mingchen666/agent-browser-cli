@@ -26,6 +26,7 @@ agent-browser-cli logs --tail 100
 
 `status` 的 `ok=true` 只表示命令执行成功；是否可用看 `healthy` 和 `summary`。
 `daemon_not_running` / `running=false` 只表示当前未常驻；在尚未执行目标命令前，这通常是正常状态，不应阻塞任务。
+如果尚未执行 `tabs` / `open` / `exec` / `scan`，不要因为 `doctor` 显示 API 端口未监听、扩展端口未监听就判断安装损坏；这些端口由 daemon 启动后监听。
 
 ## daemon 未运行
 
@@ -43,6 +44,12 @@ agent-browser-cli status
 ```
 
 浏览器任务中优先执行 `tabs/open/exec/scan` 自动启动 daemon；只有自动启动失败或需要排障时再 `restart`。`doctor` 不会自动启动 daemon。
+
+## Chrome 显示正在控制浏览器
+
+Chrome 顶部或右上角出现“正在控制你的浏览器”通常是正常现象。扩展执行 CDP / debugger 命令时会临时调用 `chrome.debugger.attach`，命令结束、连接关闭或 daemon 空闲退出后会 `detach`，所以提示可能出现、消失、下一次命令再出现。
+
+处理：不要仅凭这个提示判断扩展未连接或 daemon 异常。只有同时出现目标命令失败、`extension_not_connected`、端口不一致、或日志里有 attach/detach 错误时，才继续排查。
 
 ## 扩展未连接
 

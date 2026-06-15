@@ -28,6 +28,8 @@ agent-browser-cli logs --tail 100
 
 `status` 中 `daemon_not_running` / `running=false` 不能单独作为停止操作的理由；优先继续执行目标命令让 CLI 自动拉起 daemon。`doctor` 只检查状态，不自动启动 daemon、不改配置、不安装 skill。
 
+补充一个容易误判的点：`status` / `doctor` 里看到 `daemon_not_running`，如果此时还没有执行 `tabs` / `open` / `exec` / `scan`，通常只是 daemon 按需常驻而未启动，不代表故障。只有目标命令已经失败，或者日志/输出明确提示端口、扩展、标签页异常时，才进入排障。
+
 ## 常用命令优先级
 
 先区分三个入口：
@@ -100,6 +102,8 @@ agent-browser-cli click '@e1' --wait-js 'return document.body.innerText.includes
 ```
 
 `--wait-js` 负责等慢加载；`--monitor` 只负责操作前后页面 diff，默认关闭。
+
+Chrome 右上角“正在控制你的浏览器”是 `chrome.debugger.attach` 的正常瞬时提示，不是 daemon 常驻状态。这个提示在 CDP 命令执行期间出现、命令结束后消失，再在下一次 attach 时出现，属于预期行为；不要把它误判成扩展反复断开。
 
 弹窗处理：扩展默认不改写业务页面的 `alert` / `confirm` / `prompt`。只有 CLI 页面执行命令期间临时抑制弹窗，结束后恢复；如果怀疑页面原生弹窗行为异常，先让用户重载扩展和页面。
 
