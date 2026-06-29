@@ -103,7 +103,7 @@ agent-browser-cli click '@e1' --wait-js 'return document.body.innerText.includes
 
 `--wait-js` 负责等慢加载；`--monitor` 只负责操作前后页面 diff，默认关闭。
 
-Chrome 右上角“正在控制你的浏览器”是 `chrome.debugger.attach` 的正常瞬时提示，不是 daemon 常驻状态。这个提示在 CDP 命令执行期间出现、命令结束后消失，再在下一次 attach 时出现，属于预期行为；不要把它误判成扩展反复断开。
+Chrome 右上角“正在控制你的浏览器”是 `chrome.debugger.attach` 的正常提示，不是 daemon 常驻状态。普通 CDP 命令空闲后会延迟约 30 秒自动 detach；30 秒内同一 tab 继续执行 CDP 会复用连接并重新计时。network/console 持续监听期间不会自动 detach，停止监听或清理时才释放。
 
 弹窗处理：扩展默认不改写业务页面的 `alert` / `confirm` / `prompt`。只有 CLI 页面执行命令期间临时抑制弹窗，结束后恢复；如果怀疑页面原生弹窗行为异常，先让用户重载扩展和页面。
 
