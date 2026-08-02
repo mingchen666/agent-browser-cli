@@ -32,3 +32,4 @@ jobs:
       - run: node --check assets/tmwd_cdp_bridge/background.js
       - run: node --check assets/tmwd_cdp_bridge/content.js
       - run: node --check assets/tmwd_cdp_bridge/popup.js
+      - run: node --test tests/*.test.mjs
