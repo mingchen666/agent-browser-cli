@@ -4,9 +4,6 @@ if (window.__agentBrowserCliCleanup) window.__agentBrowserCliCleanup();
 if (window.__agentBrowserCliObserverCleanup) window.__agentBrowserCliObserverCleanup();
 document.querySelectorAll('#agent-browser-cli-ind,#agent-browser-cli-style').forEach(e => e.remove());
 
-// Remove meta CSP tags
-document.querySelectorAll('meta[http-equiv="Content-Security-Policy"]').forEach(e => e.remove());
-
 /**
  * Render a right-side floating badge that reflects the real bridge connection status.
  */

@@ -1,18 +1,19 @@
 // background.js - Cookie + CDP Bridge
+const LEGACY_CSP_RULE_ID = 9999;
+
+async function removeLegacyCspRule() {
+  try {
+    // Dynamic rules survive extension upgrades, so explicitly migrate existing installs.
+    await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: [LEGACY_CSP_RULE_ID] });
+  } catch (e) {
+    console.warn('[TMWD] Failed to remove legacy CSP rule:', e.message);
+  }
+}
+
+removeLegacyCspRule();
 chrome.runtime.onInstalled.addListener(() => {
   console.log('CDP Bridge installed');
-  // Strip CSP headers to allow eval/inline scripts
-  chrome.declarativeNetRequest.updateDynamicRules({
-    removeRuleIds: [9999],
-    addRules: [{
-      id: 9999, priority: 1,
-      action: { type: 'modifyHeaders', responseHeaders: [
-        { header: 'content-security-policy', operation: 'remove' },
-        { header: 'content-security-policy-report-only', operation: 'remove' }
-      ]},
-      condition: { urlFilter: '*', resourceTypes: ['main_frame', 'sub_frame'] }
-    }]
-  });
+  removeLegacyCspRule();
 });
 
 let lastCommandAt = 0;
