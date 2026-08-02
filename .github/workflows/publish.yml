@@ -195,6 +195,12 @@ jobs:
           extension_package="dist/chrome-extensions.zip"
           release_assets+=("${extension_package}")
           TAG_MESSAGE="$(git tag -l --format='%(contents)' "${GITHUB_REF_NAME}" | sed '/-----BEGIN PGP SIGNATURE-----/,$d' | sed '${/^$/d;}')"
+          # push tag 时 GitHub 可能自动生成 draft release（body 预填 commit subject），
+          # gh release create 会复用该 draft 发布，导致 --notes-file 不生效，这里先删除。
+          if gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${GITHUB_REF_NAME}" --jq '.draft' 2>/dev/null | grep -q '^true$'; then
+            gh api -X DELETE "repos/${GITHUB_REPOSITORY}/releases/tags/${GITHUB_REF_NAME}" >/dev/null
+            echo "Removed auto-created draft release for ${GITHUB_REF_NAME}"
+          fi
           if [[ "${GITHUB_REF_NAME}" == *-extension ]]; then
             DEFAULT_NOTES="Chrome extension and skill update only. npm packages are unchanged."
           else
