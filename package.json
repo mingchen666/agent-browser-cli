@@ -19,7 +19,8 @@
   ],
   "scripts": {
     "build": "cargo build --release",
-    "version": "node scripts/sync-optional-deps.mjs && git add package.json package-lock.json",
+    "version": "node scripts/sync-version.mjs && node scripts/sync-optional-deps.mjs && git add package.json package-lock.json Cargo.toml",
+    "sync-version": "node scripts/sync-version.mjs",
     "prepack": "node scripts/sync-optional-deps.mjs",
     "postinstall": "node npm/postinstall.js"
   },
