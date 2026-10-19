@@ -237,3 +237,92 @@ jobs:
               --notes-file release-notes.md \
               "${release_flags[@]}"
           fi
+
+  mirror-sync:
+    name: Sync npmmirror
+    # Chrome 扩展标签不发 npm 包，不需要同步镜像
+    if: ${{ !contains(github.ref_name, '-extension') }}
+    needs: publish-main
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Trigger npmmirror sync
+        shell: bash
+        run: |
+          set -euo pipefail
+          # 淘宝镜像按包独立抓取上游，历史上出现过单个平台子包漏抓（win32-x64@0.3.7）。
+          # 主包 optionalDependencies 强制要求同一版本，子包缺失时 npm 会静默跳过该依赖，
+          # 于是 Windows 用户安装"成功"、运行时才报 native binary not found。
+          # 这里发布后对主包和 5 个平台子包逐个触发回源同步。
+          base=$(node -p "require('./package.json').name")
+          packages=(
+            "${base}"
+            "${base}-darwin-arm64"
+            "${base}-darwin-x64"
+            "${base}-linux-x64"
+            "${base}-linux-arm64"
+            "${base}-win32-x64"
+          )
+          for pkg in "${packages[@]}"; do
+            encoded="${pkg//\//%2F}"
+            triggered=0
+            for attempt in 1 2 3; do
+              code=$(curl -sS -o /tmp/sync.json -w '%{http_code}' -X PUT \
+                -H 'Content-Type: application/json' -d '{}' \
+                "https://registry.npmmirror.com/-/package/${encoded}/syncs")
+              if [[ "${code}" == 2* ]]; then
+                echo "${pkg}: 已入队 $(cat /tmp/sync.json)"
+                triggered=1
+                break
+              fi
+              echo "${pkg}: HTTP ${code}，第 ${attempt} 次触发失败"
+              sleep 5
+            done
+            if [[ "${triggered}" != 1 ]]; then
+              echo "::warning::${pkg} 触发镜像同步失败，可稍后手动重试"
+            fi
+          done
+
+      - name: Wait for npmmirror to serve the new version
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=$(node -p "require('./package.json').name")
+          version=$(node -p "require('./package.json').version")
+          packages=(
+            "${base}"
+            "${base}-darwin-arm64"
+            "${base}-darwin-x64"
+            "${base}-linux-x64"
+            "${base}-linux-arm64"
+            "${base}-win32-x64"
+          )
+          summary='/tmp/mirror-sync.md'
+          printf '| 包 | 结果 |\n|---|---|\n' > "${summary}"
+          failed=0
+          for pkg in "${packages[@]}"; do
+            synced=0
+            # 镜像同步实测约 2 分钟落库，最多等 5 分钟（10 次 x 30s）
+            for attempt in $(seq 1 10); do
+              if [[ "$(npm view "${pkg}@${version}" version --registry=https://registry.npmmirror.com 2>/dev/null || true)" == "${version}" ]]; then
+                synced=1
+                break
+              fi
+              sleep 30
+            done
+            if [[ "${synced}" == 1 ]]; then
+              echo "${pkg}@${version} 镜像已同步"
+              printf '| %s | 已同步 |\n' "${pkg}" >> "${summary}"
+            else
+              echo "::warning::${pkg}@${version} 等待 5 分钟仍未出现在 npmmirror，稍后会自行重试"
+              printf '| %s | 未确认（镜像可能延迟） |\n' "${pkg}" >> "${summary}"
+              failed=1
+            fi
+          done
+          cat "${summary}" >> "${GITHUB_STEP_SUMMARY}"
+          # 镜像状态不影响发布结果，只告警不失败
+          if [[ "${failed}" == 1 ]]; then
+            echo "::warning::部分包在 npmmirror 上未确认同步，建议手动检查"
+          fi
